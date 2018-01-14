@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+{% block body %}
+  <h1>Login</h1>
+  <form method=post>
+    <dl>
+      <dt>Email:
+      <dd><input type=text name=email>
+      <dt>Password:
+      <dd><input type=password name=password>
+    </dl>
+    <p><input type=submit value=Login>
+  </form>
+  <a href="{{ url_for('user.request_password_reset') }}">Forgot password?</a>
+  <br><a href="{{ url_for('user.register') }}">Register</a>
+{% endblock %}

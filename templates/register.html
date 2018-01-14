@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+{% block body %}
+  <h1>Register</h1>
+  <form method=post>
+    <dl>
+      <dt>Email:
+      <dd><input type=text name=email>
+      <dt>Password:
+      <dd><input type=password name=password>
+      <dt>Confirm Password:
+      <dd><input type=password name=password_confirmation>
+    </dl>
+    <p><input type=submit value=Register>
+  </form>
+{% endblock %}
