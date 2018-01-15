@@ -2,7 +2,7 @@ from argon2 import PasswordHasher
 from psycopg2 import IntegrityError
 from validate_email import validate_email
 from argon2.exceptions import VerifyMismatchError
-from file_host import app_name, get_db_connection
+from file_host.helpers import app_name, get_db_connection
 from flask import (Blueprint, current_app, flash, g, redirect, request,
                    session, render_template, url_for)
 

@@ -1,7 +1,8 @@
 import os
 import unittest
 from functools import partial
-from file_host import create_app, get_db_connection, views
+from file_host import create_app, views
+from file_host.helpers import get_db_connection
 from flask import (current_app, g, make_response, _request_ctx_stack,
                    session, url_for)
 
