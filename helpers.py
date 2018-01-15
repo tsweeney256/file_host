@@ -1,8 +1,6 @@
 import psycopg2
 from flask import current_app, g
 
-app_name = 'file_host'
-
 
 def get_db_connection():
     if not g.get('db', None):

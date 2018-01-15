@@ -1,7 +1,8 @@
 import os
 import unittest
 from functools import partial
-from file_host import create_app, views
+from file_host import create_app
+import file_host.blueprints as blueprints
 from file_host.helpers import get_db_connection
 from flask import (current_app, g, make_response, _request_ctx_stack,
                    session, url_for)
@@ -164,7 +165,7 @@ class MyTests(unittest.TestCase):
             self.assertFlashed(flashes)
         if login:
             self.assert_post_login(
-                flashes=None, redirect_loc='user.index',
+                flashes=None, redirect_loc='index.index',
                 email=email, password=password)
         return generated_reset_url
 
@@ -179,7 +180,7 @@ class MyTests(unittest.TestCase):
                 'password': password,
                 'password_confirmation': password_confirmation
             })
-        return TestRequestWrapper(ctx, views.register)
+        return TestRequestWrapper(ctx, blueprints.user.views.register)
 
     def post_login(self, email, password):
         ctx = self.app.test_request_context(
@@ -189,7 +190,7 @@ class MyTests(unittest.TestCase):
                 'email': email,
                 'password': password,
             })
-        return TestRequestWrapper(ctx, views.login)
+        return TestRequestWrapper(ctx, blueprints.user.views.login)
 
     def post_request_password_reset(self, email):
         ctx = self.app.test_request_context(
@@ -198,7 +199,8 @@ class MyTests(unittest.TestCase):
             data={
                 'email': email
             })
-        return TestRequestWrapper(ctx, views.request_password_reset)
+        return TestRequestWrapper(
+            ctx, blueprints.user.views.request_password_reset)
 
     def post_reset_password(self, site_user_id, reset_url, password,
                             password_confirmation=None):
@@ -212,7 +214,7 @@ class MyTests(unittest.TestCase):
                 'password': password,
                 'password_confirmation': password_confirmation
             })
-        return TestRequestWrapper(ctx, views.reset_password,
+        return TestRequestWrapper(ctx, blueprints.user.views.reset_password,
                                   site_user_id=site_user_id,
                                   reset_url=reset_url)
 
@@ -243,9 +245,10 @@ class MyTests(unittest.TestCase):
 
     def test_password_confirmation(self):
         with self.app.test_request_context():
-            self.assertFalse(views._is_valid_password('', ''))
-            self.assertFalse(views._is_valid_password('a', 'A'))
-            self.assertFalse(views._is_valid_password('a', 'b'))
+            is_valid_password = blueprints.user.views._is_valid_password
+            self.assertFalse(is_valid_password('', ''))
+            self.assertFalse(is_valid_password('a', 'A'))
+            self.assertFalse(is_valid_password('a', 'b'))
 
     def _assert_multi_func(self, func, flashes, flash_append, data):
         """Template for functions like assert_malformed_email()"""
@@ -286,11 +289,11 @@ class MyTests(unittest.TestCase):
         self._assert_multi_func(func, flashes, flash_append, data)
 
     def test_index(self):
-        ret = self.client.get(url_for('user.index'))
+        ret = self.client.get(url_for('index.index'))
         self.assertRedirect(ret, 'user.login')
-        with self.app.test_request_context(url_for('user.index')):
+        with self.app.test_request_context(url_for('index.index')):
             session['site_user_id'] = 1
-            response = make_response(views.index())
+            response = make_response(blueprints.index.views.index())
             response = self.app.process_response(response)
         self.assertEqual(response.status_code, 200)
 
@@ -305,7 +308,7 @@ class MyTests(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         # registration works when empty
         self.assert_post_registration(
-            flashes=success_flash, redirect_loc='user.index',
+            flashes=success_flash, redirect_loc='index.index',
             email=user, password=password)
         # no duplicates allowed
         self.assert_post_registration(
@@ -313,7 +316,7 @@ class MyTests(unittest.TestCase):
             email=user, password=password)
         # registration works when not empty and after previous failure
         self.assert_post_registration(
-            flashes=success_flash, redirect_loc='user.index',
+            flashes=success_flash, redirect_loc='index.index',
             email=user2, password=password2)
         # reject malformed emails
         func = partial(self.assert_post_registration, redirect_loc=None,
@@ -340,7 +343,7 @@ class MyTests(unittest.TestCase):
         # test login of first user
         test_user, test_pass = 'blah@blah.blah', 'blah'
         self.assert_post_login(flashes=success_flash,
-                               redirect_loc='user.index', create_user=True,
+                               redirect_loc='index.index', create_user=True,
                                email=test_user, password=test_pass)
         # login fails with non-existent account with non-empty database
         self.assert_post_login(flashes=failure_flash, redirect_loc=None,
@@ -348,7 +351,7 @@ class MyTests(unittest.TestCase):
         # test login of second user
         test_user2, test_pass2 = 'hooplah@hooplah.hooplah', 'hooplah'
         self.assert_post_login(flashes=success_flash,
-                               redirect_loc='user.index', create_user=True,
+                               redirect_loc='index.index', create_user=True,
                                email=test_user2, password=test_pass2)
         # test completely wrong password
         self.assert_post_login(flashes=failure_flash, redirect_loc=None,
@@ -436,7 +439,7 @@ class MyTests(unittest.TestCase):
         self.assert_post_reset_password(
             flashes=success, site_user_id=self.site_user_id, password="new",
             email=user, login=True, reset_url=first_url,
-            redirect_loc='user.index')
+            redirect_loc='index.index')
         # block redeemed request
         self.assert_post_reset_password(
             flashes=redeemed, site_user_id=self.site_user_id,
@@ -459,13 +462,14 @@ class MyTests(unittest.TestCase):
         # Reset second password
         self.assert_post_reset_password(
             flashes=success, site_user_id=self.site_user_id,
-            password=password, reset_url=second_url, redirect_loc='user.index')
+            password=password, reset_url=second_url,
+            redirect_loc='index.index')
         # Reset password of second user
         user2, password2 = 'user2@user.com', 'password2'
         self.assert_post_reset_password(
             flashes=success, site_user_id=self.site_user_id+1, email=user2,
             password=password2, create_user=True, request_reset=True,
-            redirect_loc='user.index')
+            redirect_loc='index.index')
         # block older reset_urls when newer exist
         current_app.config['PASS_RESET_EXPR'] = '0 days'
         loop_urls = []
@@ -482,7 +486,8 @@ class MyTests(unittest.TestCase):
         # Reset newest password when older ones exist
         self.assert_post_reset_password(
             flashes=success, site_user_id=self.site_user_id,
-            password="new", reset_url=loop_urls[-1], redirect_loc='user.index')
+            password="new", reset_url=loop_urls[-1],
+            redirect_loc='index.index')
         # Reject password mismatch and blank passwords
         pass_mismatch_url = self.assert_post_request_password_reset(
             flashes=request_success, email="new@guy.com", password="hooplah",

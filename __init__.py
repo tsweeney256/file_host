@@ -1,13 +1,14 @@
 import os
-from file_host.helpers import app_name
 from flask import Flask
 
 
 def create_app(settings_file):
-    app = Flask(app_name)
+    app = Flask(__name__)
     app.config.from_pyfile(settings_file)
-    import file_host.views
-    app.register_blueprint(file_host.views.user)
+    import file_host.blueprints.index.views as index_views
+    app.register_blueprint(index_views.blueprint)
+    import file_host.blueprints.user.views as user_views
+    app.register_blueprint(user_views.blueprint)
     return app
 
 

@@ -2,11 +2,11 @@ from argon2 import PasswordHasher
 from psycopg2 import IntegrityError
 from validate_email import validate_email
 from argon2.exceptions import VerifyMismatchError
-from file_host.helpers import app_name, get_db_connection
+from file_host.helpers import get_db_connection
 from flask import (Blueprint, current_app, flash, g, redirect, request,
                    session, render_template, url_for)
 
-user = Blueprint('user', app_name)
+blueprint = Blueprint('user', __name__, template_folder='templates')
 
 
 # call this to logout instead of session.pop directly just in case the
@@ -30,16 +30,9 @@ def _is_valid_password(pass1, pass2):
     return True
 
 
-@user.route('/')
-def index():
-    if 'site_user_id' not in session:
-        return redirect(url_for('user.login'))
-    return render_template('index.html')
-
-
-@user.route('/login/', methods=['GET', 'POST'])
+@blueprint.route('/login/', methods=['GET', 'POST'])
 def login():
-    this_page = 'login.html'
+    this_page = 'user/login.html'
     if request.method == 'POST':
         hasher = PasswordHasher()
         db_connection = get_db_connection()
@@ -57,16 +50,16 @@ def login():
         try:
             hasher.verify(db_password, request.form['password'])
             _login(db_user_id)
-            return redirect(url_for('user.index'))
+            return redirect(url_for('index.index'))
         except VerifyMismatchError:
             flash('Invalid email or password')
             render_template(this_page)
     return render_template(this_page)
 
 
-@user.route('/register/', methods=['GET', 'POST'])
+@blueprint.route('/register/', methods=['GET', 'POST'])
 def register():
-    this_page = 'register.html'
+    this_page = 'user/register.html'
     if request.method == 'POST':
         if not _is_valid_password(request.form['password'],
                                   request.form['password_confirmation']):
@@ -89,13 +82,13 @@ def register():
             db_cursor.execute('select * from lastval();')
             _login(db_cursor.fetchone()[0])
             flash('You are now registered and signed in')
-            return redirect(url_for('user.index'))
+            return redirect(url_for('index.index'))
     return render_template(this_page)
 
 
-@user.route('/password_reset/', methods=['GET', 'POST'])
+@blueprint.route('/password_reset/', methods=['GET', 'POST'])
 def request_password_reset():
-    this_page = 'request_password_reset.html'
+    this_page = 'user/request_password_reset.html'
     if request.method == 'POST':
         db_connection = get_db_connection()
         db_cursor = db_connection.cursor()
@@ -126,10 +119,10 @@ def request_password_reset():
     return render_template(this_page)
 
 
-@user.route('/password_reset/<site_user_id>/<reset_url>/',
-            methods=['GET', 'POST'])
+@blueprint.route('/password_reset/<site_user_id>/<reset_url>/',
+                 methods=['GET', 'POST'])
 def reset_password(site_user_id, reset_url):
-    this_page = 'reset_password.html'
+    this_page = 'user/reset_password.html'
     if request.method == 'POST':
         if not _is_valid_password(request.form['password'],
                                   request.form['password_confirmation']):
@@ -151,11 +144,11 @@ def reset_password(site_user_id, reset_url):
         elif reset_password_code == 'failure_expired':
             flash('This password reset URL has already expired. Please '
                   'request another reset.')
-            return redirect(url_for('user.request_password_reset'))
+            return redirect(url_for('.request_password_reset'))
         elif reset_password_code == 'failure_redeemed':
             flash('This password reset URL has already been used to reset '
                   'your password. Please request another reset.')
-            return redirect(url_for('user.request_password_reset'))
+            return redirect(url_for('.request_password_reset'))
         elif reset_password_code == 'failure_redeemed_exisiting_request':
             flash('This password reset URL has already been used to reset '
                   'your password. You have already filed a new request to '
@@ -165,7 +158,7 @@ def reset_password(site_user_id, reset_url):
         elif reset_password_code == 'success':
             flash('Your password has been reset and you have been signed in.')
             _login(site_user_id)
-            return redirect(url_for('user.index'))
+            return redirect(url_for('index.index'))
         else:
             flash('An unknown error occurred. The administrator has '
                   'automatically been notified. Please try again later.')
