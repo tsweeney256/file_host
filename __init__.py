@@ -1,5 +1,6 @@
 import os
 from flask import Flask
+from flask_mail import Mail
 from file_host.helpers import get_db_connection
 
 
@@ -14,6 +15,7 @@ def create_app(settings_file):
             for id, name in cursor:
                 site_user_statuses[name] = id
     app.config['site_user_statuses'] = site_user_statuses
+    app.config['mail'] = Mail(app)
     import file_host.blueprints.index.views as index_views
     app.register_blueprint(index_views.blueprint)
     import file_host.blueprints.user.views as user_views

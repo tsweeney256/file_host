@@ -1,3 +1,4 @@
+from flask_mail import Message
 from argon2 import PasswordHasher
 from psycopg2 import IntegrityError
 from validate_email import validate_email
@@ -80,9 +81,22 @@ def register():
                 flash('This email is already associated with an account')
                 return render_template(this_page)
             db_cursor.execute('select * from lastval();')
-            _login(db_cursor.fetchone()[0])
-            flash('You are now registered and signed in')
-            return redirect(url_for('index.index'))
+            new_site_user_id = db_cursor.fetchone()[0]
+            db_cursor.callproc(
+                'create_registration_confirmation_entry', [new_site_user_id])
+            registration_confirmation_url = db_cursor.fetchone()[0]
+            mail_msg = Message('Welcome', recipients=[request.form['email']])
+            mail_msg.html = ('Please click the following link to complete '
+                             'your registration: '
+                             '<br><a href={0}/register/{1}/{2}>'
+                             '{0}/register/{1}/{2}</a>'
+                             .format(current_app.config['SERVER_NAME'],
+                                     new_site_user_id,
+                                     registration_confirmation_url))
+            current_app.config['mail'].send(mail_msg)
+            flash('A confirmation email has been sent. '
+                  'Please check your inbox.')
+            return redirect(url_for('user.login'))
     return render_template(this_page)
 
 

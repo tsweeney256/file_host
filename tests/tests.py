@@ -108,11 +108,8 @@ class MyTests(unittest.TestCase):
             if update_user_id:
                 self.site_user_id += 1
             if redirect_loc:
-                self.assertEqual(self.site_user_id, session['site_user_id'])
                 self.assertRedirect(ret.response, redirect_loc)
                 response = ret.follow_redirect()
-            else:
-                self.assertNotIn('site_user_id', session)
             self.assertFlashed(flashes)
             self.assertEqual(response.status_code, status_code)
 
@@ -305,7 +302,8 @@ class MyTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_registration(self):
-        success_flash = ('message', 'You are now registered and signed in')
+        success_flash = ('message', 'A confirmation email has been sent. '
+                         'Please check your inbox.')
         duplicate_flash = ('message',
                            'This email is already associated with an account')
         user, password = 'blah@blah.blah', 'blah'
@@ -315,7 +313,7 @@ class MyTests(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         # registration works when empty
         self.assert_post_registration(
-            flashes=success_flash, redirect_loc='index.index',
+            flashes=success_flash, redirect_loc='user.login',
             email=user, password=password)
         # no duplicates allowed
         self.assert_post_registration(
@@ -323,7 +321,7 @@ class MyTests(unittest.TestCase):
             email=user, password=password)
         # registration works when not empty and after previous failure
         self.assert_post_registration(
-            flashes=success_flash, redirect_loc='index.index',
+            flashes=success_flash, redirect_loc='user.login',
             email=user2, password=password2)
         # reject malformed emails
         func = partial(self.assert_post_registration, redirect_loc=None,
