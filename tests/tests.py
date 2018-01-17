@@ -12,6 +12,7 @@ from flask import (current_app, g, make_response, _request_ctx_stack,
 user_tables = [
     'login',
     'password_reset',
+    'registration_confirmation',
     'site_user',
 ]
 

@@ -1,12 +1,15 @@
 begin;
 
 set local client_min_messages=warning;
+alter table if exists registration_confirmation
+    drop constraint if exists registration_confirmation_site_user_id_fkey;
 alter table if exists file
     drop constraint if exists file_site_user_id_fkey;
 alter table if exists login
     drop constraint if exists login_site_user_id_fkey;
 alter table if exists password_reset
     drop constraint if exists password_reset_site_user_id_fkey;
+drop table if exists registration_confirmation;
 drop table if exists site_user;
 drop table if exists file;
 drop table if exists login;
@@ -35,6 +38,15 @@ create table site_user (
     deleted boolean not null default false
 );
 grant select, insert, update on table site_user to file_host_group;
+
+create table registration_confirmation(
+    registration_confirmation_id bigserial primary key,
+    site_user_id bigserial unique not null references site_user(site_user_id),
+    url varchar unique not null,
+    redeemed boolean not null default false
+);
+grant select, insert, update on table
+    registration_confirmation to file_host_group;
 
 create table file (
     file_id bigserial primary key,
