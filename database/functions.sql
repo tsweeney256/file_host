@@ -34,7 +34,7 @@ declare
     v_url text;
 begin
     select site_user_id into v_site_user_id from site_user
-        where email = v_email and deleted = false;
+        where email = v_email and status_id < 4;
     if v_site_user_id is null then
         select 'failure_not_account', null::text into v_ret;
         return v_ret;
