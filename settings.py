@@ -1,3 +1,6 @@
+import getpass
+
+
 # Example settings
 #
 # Please make your own settings file and map the environment variable
@@ -18,3 +21,17 @@ DBUSER = 'file_host_user'
 # DBPASS = 'password'
 # DBPORT = 1234
 # DBHOST = 'host'
+
+# Flask-Mail settings
+# Refer to Flask-Mail's documentation
+# MAIL_SERVER = 'localhost'
+# MAIL_PORT = 25
+# MAIL_USE_TKS = False
+# MAIL_USE_SSL = False
+# MAIL_DEBUG = DEBUG # Defaults to app.debug
+# MAIL_USERNAE = None
+# MAIL_PASSWORD = None
+MAIL_DEFAULT_SENDER = getpass.getuser()
+# MAIL_MAX_EMAILS = None
+# MAIL_SUPPRESS_SEND = False # Defaults to app.testing
+# MAIL_ASCII_ATTACHMENTS = False
