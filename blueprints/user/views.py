@@ -139,8 +139,18 @@ def request_password_reset():
         elif result_code == 'success':
             flash('Your password reset request has been sent. Please check '
                   'your email for further instructions.')
-            # TODO: actually email the person the reset url
             g.password_reset_url = ret[2]
+            site_user_id = ret[1]
+            mail_msg = Message(
+                'Password Reset', recipients=[request.form['email']])
+            mail_msg.html = ('Please click the following link to reset '
+                             'your password: '
+                             '<br><a href={0}/password_reset/{1}/{2}>'
+                             '{0}/password_reset/{1}/{2}</a>'
+                             .format(current_app.config['SERVER_NAME'],
+                                     site_user_id,
+                                     g.password_reset_url))
+            current_app.config['mail'].send(mail_msg)
         else:
             flash('An error with the website has occured. The administrator '
                   'has automatically been notified and is working to fix the '
