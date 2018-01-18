@@ -122,9 +122,9 @@ def request_password_reset():
     if request.method == 'POST':
         db_connection = get_db_connection()
         db_cursor = db_connection.cursor()
-        db_cursor.execute('select a,b from '
+        db_cursor.execute('select a,b,c from '
                           'create_password_reset_entry(%s, %s, %s) '
-                          'as (a text, b text);',
+                          'as (a text, b bigint, c text);',
                           [request.form['email'], '127.0.0.1',
                            current_app.config['PASS_RESET_EXPR']])
         db_connection.commit()
@@ -139,8 +139,8 @@ def request_password_reset():
         elif result_code == 'success':
             flash('Your password reset request has been sent. Please check '
                   'your email for further instructions.')
-            g.password_reset_url = ret[1]
             # TODO: actually email the person the reset url
+            g.password_reset_url = ret[2]
         else:
             flash('An error with the website has occured. The administrator '
                   'has automatically been notified and is working to fix the '

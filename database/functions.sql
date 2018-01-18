@@ -88,7 +88,7 @@ begin
     select site_user_id into v_site_user_id from site_user
         where email = v_email and status_id < 4;
     if v_site_user_id is null then
-        select 'failure_not_account', null::text into v_ret;
+        select 'failure_not_account', null::bigint, null::text into v_ret;
         return v_ret;
     end if;
     select * into v_password_reset_entry from password_reset
@@ -100,13 +100,13 @@ begin
             select random_url(18) into v_url;
             insert into password_reset (site_user_id, ip, url)
                 values (v_site_user_id, v_ip, v_url);
-            select 'success', v_url  into v_ret;
+            select 'success', v_site_user_id, v_url  into v_ret;
             return v_ret;
             exception when unique_violation then -- loop again
         end;
         end loop;
     end if;
-    select 'failure_existing_request', null::text into v_ret;
+    select 'failure_existing_request', null::bigint, null::text into v_ret;
     return v_ret;
 end;
 $$ language plpgsql;
