@@ -4,7 +4,7 @@ from psycopg2 import IntegrityError
 from validate_email import validate_email
 from argon2.exceptions import VerifyMismatchError
 from file_host.helpers import get_db_connection
-from flask import (Blueprint, current_app, flash, g, redirect, request,
+from flask import (abort, Blueprint, current_app, flash, g, redirect, request,
                    session, render_template, url_for)
 
 blueprint = Blueprint('user', __name__, template_folder='templates')
@@ -96,8 +96,24 @@ def register():
             current_app.config['mail'].send(mail_msg)
             flash('A confirmation email has been sent. '
                   'Please check your inbox.')
+            g.registration_confirmation_url = registration_confirmation_url
             return redirect(url_for('user.login'))
     return render_template(this_page)
+
+
+@blueprint.route('/register/<site_user_id>/<confirmation_url>/')
+def confirm_registration(site_user_id, confirmation_url):
+    with get_db_connection() as db_connection:
+        db_cursor = db_connection.cursor()
+        db_cursor.callproc('confirm_registration',
+                           [site_user_id, confirmation_url,
+                            current_app.config['REG_CONFIRM_EXPR']])
+        proc_result = db_cursor.fetchone()[0]
+        if proc_result == 'failure_wrong_id':
+            abort(404)
+        flash('Registration confirmed. You have automatically been signed in')
+        _login(site_user_id)
+    return redirect(url_for('index.index'))
 
 
 @blueprint.route('/password_reset/', methods=['GET', 'POST'])
