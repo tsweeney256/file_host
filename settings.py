@@ -6,10 +6,12 @@ import getpass
 # Please make your own settings file and map the environment variable
 # FILE_HOST_SETTINGS to it
 
-# Required settings
 SERVER_NAME = 'localhost:5000'
 SECRET_KEY = 'secret'
-PASS_RESET_EXPR = '1 day'  # Time until the password reset request expires
+# Time until the registration confirmation period expires
+REG_CONFIRM_EXPR = '1 day'
+# Time until the password reset request expires
+PASS_RESET_EXPR = '1 day'
 
 # Optional settings
 DEBUG = True  # Defaults to False
