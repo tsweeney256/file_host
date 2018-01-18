@@ -1,13 +1,19 @@
 begin;
 
 set local client_min_messages=warning;
+alter table if exists site_user
+    drop constraint if exists site_user_status_id_fkey;
+alter table if exists registration_confirmation
+    drop constraint if exists registration_confirmation_site_user_id_fkey;
 alter table if exists file
     drop constraint if exists file_site_user_id_fkey;
 alter table if exists login
     drop constraint if exists login_site_user_id_fkey;
 alter table if exists password_reset
     drop constraint if exists password_reset_site_user_id_fkey;
+drop table if exists registration_confirmation;
 drop table if exists site_user;
+drop table if exists site_user_status;
 drop table if exists file;
 drop table if exists login;
 drop table if exists password_reset;
@@ -18,6 +24,15 @@ create function now_utc() returns timestamp as $$
     select now() at time zone 'utc';
 $$ language sql;
 grant execute on function now_utc() to file_host_group;
+
+create table site_user_status (
+    status_id smallserial primary key,
+    status varchar not null
+);
+grant select on table site_user_status to file_host_group;
+insert into site_user_status (status)
+    values ('confirmation_pending'), ('confirmed'), ('compromised'),
+           ('banned'), ('deleted');
 
 -- "site_user" because the SQL standards comittee has no restraint
 -- when it comes to keywords
@@ -32,9 +47,18 @@ create table site_user (
     creation_time timestamp not null default now_utc(),
     last_action_time timestamp not null default now_utc(),
     never_auto_delete_account boolean not null default false,
-    deleted boolean not null default false
+    status_id smallint not null default 1 references site_user_status(status_id)
 );
 grant select, insert, update on table site_user to file_host_group;
+
+create table registration_confirmation(
+    registration_confirmation_id bigserial primary key,
+    site_user_id bigserial unique not null references site_user(site_user_id),
+    url varchar unique not null,
+    redeemed boolean not null default false
+);
+grant select, insert, update on table
+    registration_confirmation to file_host_group;
 
 create table file (
     file_id bigserial primary key,

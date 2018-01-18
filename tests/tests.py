@@ -3,6 +3,7 @@ import re
 import unittest
 from functools import partial
 from file_host import create_app
+from werkzeug.exceptions import NotFound
 import file_host.blueprints as blueprints
 from file_host.helpers import get_db_connection
 from flask import (current_app, g, make_response, _request_ctx_stack,
@@ -12,6 +13,7 @@ from flask import (current_app, g, make_response, _request_ctx_stack,
 user_tables = [
     'login',
     'password_reset',
+    'registration_confirmation',
     'site_user',
 ]
 
@@ -107,13 +109,35 @@ class MyTests(unittest.TestCase):
             if update_user_id:
                 self.site_user_id += 1
             if redirect_loc:
-                self.assertEqual(self.site_user_id, session['site_user_id'])
                 self.assertRedirect(ret.response, redirect_loc)
                 response = ret.follow_redirect()
-            else:
-                self.assertNotIn('site_user_id', session)
             self.assertFlashed(flashes)
             self.assertEqual(response.status_code, status_code)
+            return g.get('registration_confirmation_url', None)
+
+    def assert_get_confirm_registration(
+            self, flashes, site_user_id, confirmation_url=None,
+            redirect_loc=None, status_code=200, email=None, password=None,
+            create_user=False):
+        new_url = None
+        if create_user:
+            self.post_registration(email, password).run()
+            new_url = g.registration_confirmation_url
+            self.site_user_id += 1
+        try:
+            with self.get_confirm_registration(
+                    site_user_id,
+                    confirmation_url if confirmation_url else new_url) as ret:
+                response = ret.response
+                if redirect_loc:
+                    self.assertRedirect(ret.response, redirect_loc)
+                    response = ret.follow_redirect()
+                self.assertFlashed(flashes)
+                self.assertEqual(response.status_code, status_code)
+                return confirmation_url if confirmation_url else new_url
+        except NotFound:
+            self.assertEqual(status_code, 404)
+        return None
 
     def assert_post_login(self, flashes, redirect_loc, email, password,
                           status_code=200, create_user=False):
@@ -187,6 +211,15 @@ class MyTests(unittest.TestCase):
                 'password_confirmation': password_confirmation
             })
         return TestRequestWrapper(ctx, blueprints.user.views.register)
+
+    def get_confirm_registration(self, site_user_id, confirmation_url):
+        ctx = self.app.test_request_context(
+            url_for('user.confirm_registration',
+                    site_user_id=site_user_id,
+                    confirmation_url=confirmation_url))
+        return TestRequestWrapper(
+            ctx, blueprints.user.views.confirm_registration,
+            site_user_id=site_user_id, confirmation_url=confirmation_url)
 
     def post_login(self, email, password):
         ctx = self.app.test_request_context(
@@ -304,17 +337,18 @@ class MyTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_registration(self):
-        success_flash = ('message', 'You are now registered and signed in')
+        success_flash = ('message', 'A confirmation email has been sent. '
+                         'Please check your inbox.')
         duplicate_flash = ('message',
                            'This email is already associated with an account')
-        user, password = 'blah@blah.blah', 'blah'
-        user2, password2 = 'hooplah@hoop.lah', 'hooplah'
+        user, password = 'blah@localhost', 'blah'
+        user2, password2 = 'hooplah@localhost', 'hooplah'
         # page is available
         resp = self.client.get(url_for('user.register'))
         self.assertEqual(resp.status_code, 200)
         # registration works when empty
         self.assert_post_registration(
-            flashes=success_flash, redirect_loc='index.index',
+            flashes=success_flash, redirect_loc='user.login',
             email=user, password=password)
         # no duplicates allowed
         self.assert_post_registration(
@@ -322,7 +356,7 @@ class MyTests(unittest.TestCase):
             email=user, password=password)
         # registration works when not empty and after previous failure
         self.assert_post_registration(
-            flashes=success_flash, redirect_loc='index.index',
+            flashes=success_flash, redirect_loc='user.login',
             email=user2, password=password2)
         # reject malformed emails
         func = partial(self.assert_post_registration, redirect_loc=None,
@@ -336,6 +370,53 @@ class MyTests(unittest.TestCase):
 
         # TODO: Test registration prevention when logged in
 
+    def test_confirm_registration(self):
+        success_flash = ('message', 'Registration confirmed. You have '
+                         'automatically been signed in')
+        user, password = 'blah@localhost', 'blah'
+        user2, password2 = 'hooplah@localhost', 'hooplah'
+
+        # fails when bad url and no users
+        self.assert_get_confirm_registration(
+            flashes=None, site_user_id=1, confirmation_url='bad',
+            status_code=404)
+
+        # confirm first user
+        first_url = self.assert_get_confirm_registration(
+            flashes=success_flash, site_user_id=self.site_user_id+1,
+            email=user, password=password, redirect_loc='index.index',
+            create_user=True)
+
+        # fails when already redeemed
+        self.assert_get_confirm_registration(
+            flashes=None, site_user_id=self.site_user_id+1,
+            confirmation_url=first_url, status_code=404)
+
+        # fails when bad url and one user
+        self.assert_get_confirm_registration(
+            flashes=None, site_user_id=1, confirmation_url='bad',
+            status_code=404)
+
+        # fails when correct user and bad confirmation url
+        self.post_registration(user2, password2).run()
+        second_url = g.registration_confirmation_url
+        self.site_user_id += 1
+        self.assert_get_confirm_registration(
+            flashes=None, site_user_id=self.site_user_id,
+            confirmation_url='bad', status_code=404)
+
+        # fails when expired
+        original_expiration = current_app.config['REG_CONFIRM_EXPR']
+        current_app.config['REG_CONFIRM_EXPR'] = '0 days'
+        self.assert_get_confirm_registration(
+            flashes=None, site_user_id=self.site_user_id,
+            confirmation_url=second_url, status_code=404)
+        current_app.config['REG_CONFIRM_EXPR'] = original_expiration
+        # confirm second user
+        self.assert_get_confirm_registration(
+            flashes=success_flash, site_user_id=self.site_user_id,
+            confirmation_url=second_url, redirect_loc='index.index')
+
     def test_login(self):
         success_flash = None
         failure_flash = ('message', 'Invalid email or password')
@@ -347,7 +428,7 @@ class MyTests(unittest.TestCase):
         self.assert_post_login(flashes=failure_flash, redirect_loc=None,
                                email='doesnt', password='exist')
         # test login of first user
-        test_user, test_pass = 'blah@blah.blah', 'blah'
+        test_user, test_pass = 'blah@localhost', 'blah'
         self.assert_post_login(flashes=success_flash,
                                redirect_loc='index.index', create_user=True,
                                email=test_user, password=test_pass)
@@ -355,7 +436,7 @@ class MyTests(unittest.TestCase):
         self.assert_post_login(flashes=failure_flash, redirect_loc=None,
                                email='doesnt', password='exist')
         # test login of second user
-        test_user2, test_pass2 = 'hooplah@hooplah.hooplah', 'hooplah'
+        test_user2, test_pass2 = 'hooplah@localhost', 'hooplah'
         self.assert_post_login(flashes=success_flash,
                                redirect_loc='index.index', create_user=True,
                                email=test_user2, password=test_pass2)
@@ -382,7 +463,7 @@ class MyTests(unittest.TestCase):
         resp = self.client.get(url_for('user.request_password_reset'))
         self.assertEqual(resp.status_code, 200)
         # test request for nonexistent account when empty
-        user, password = 'blah@blah.blah', 'blah'
+        user, password = 'blah@localhost', 'blah'
         self.assert_post_request_password_reset(
             flashes=nonexistent_flash, email=user)
         # test request for existing account
@@ -396,7 +477,7 @@ class MyTests(unittest.TestCase):
         self.assert_post_request_password_reset(
             flashes=nonexistent_flash, email='nonexistent')
         # test request for sexond existing account
-        user2, password2 = 'hooplah@hooplah.hooplah', 'hooplah'
+        user2, password2 = 'hooplah@localhost', 'hooplah'
         self.assert_post_request_password_reset(
             flashes=success_flash, email=user2, password=password2,
             create_user=True)
@@ -405,7 +486,7 @@ class MyTests(unittest.TestCase):
             flashes=existing_request, email=user)
 
     def test_reset_password(self):
-        user, password = 'blah@blah.blah', 'blah'
+        user, password = 'blah@localhost', 'blah'
         invalid_params = ('message',
                           'Invalid parameters. Future invalid attempts will '
                           'result in a ban')
@@ -471,7 +552,7 @@ class MyTests(unittest.TestCase):
             password=password, reset_url=second_url,
             redirect_loc='index.index')
         # Reset password of second user
-        user2, password2 = 'user2@user.com', 'password2'
+        user2, password2 = 'user2@localhost', 'password2'
         self.assert_post_reset_password(
             flashes=success, site_user_id=self.site_user_id+1, email=user2,
             password=password2, create_user=True, request_reset=True,
@@ -496,7 +577,7 @@ class MyTests(unittest.TestCase):
             redirect_loc='index.index')
         # Reject password mismatch and blank passwords
         pass_mismatch_url = self.assert_post_request_password_reset(
-            flashes=request_success, email="new@guy.com", password="hooplah",
+            flashes=request_success, email="new@localhost", password="hooplah",
             create_user=True)
         func = partial(self.assert_post_reset_password, redirect_loc=None,
                        reset_url=pass_mismatch_url,
