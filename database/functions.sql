@@ -2,6 +2,9 @@ begin;
 
 set local client_min_messages=warning;
 create extension if not exists "pgcrypto";
+drop function if exists create_registration_confirmation_entry(
+                                        v_site_user_id bigint);
+drop function if exists confirm_registration(bigint, varchar, interval);
 drop function if exists create_password_reset_entry(varchar, cidr);
 drop function if exists create_password_reset_entry(varchar, cidr, interval);
 drop function if exists reset_site_user_password(
@@ -22,6 +25,55 @@ begin
 end;
 $$ language plpgsql;
 grant execute on function random_url(int) to file_host_group;
+
+create function create_registration_confirmation_entry(
+    v_site_user_id bigint) returns varchar as $$
+declare
+    v_url varchar;
+begin
+    loop
+    begin
+        select random_url(18) into v_url;
+        insert into registration_confirmation (site_user_id, url)
+            values (v_site_user_id, v_url);
+        return v_url;
+        exception when unique_violation then --loop again
+    end;
+    end loop;
+end;
+$$ language plpgsql;
+revoke execute on function
+    create_registration_confirmation_entry(
+        v_site_user_id bigint) from public;
+grant execute on function
+    create_registration_confirmation_entry(
+        v_site_user_id bigint) to file_host_group;
+
+create function confirm_registration(
+    v_site_user_id bigint,
+    v_confirmation_url varchar,
+    v_expire_after interval) returns varchar as $$
+begin
+    perform from registration_confirmation inner join site_user
+        on registration_confirmation.site_user_id = site_user.site_user_id
+        where site_user.site_user_id = v_site_user_id
+        and url = v_confirmation_url
+        and now_utc() < creation_time + v_expire_after
+        and redeemed = false;
+    if not found then
+        return 'failure_wrong_id';
+    end if;
+    update site_user set status_id = 2
+        where site_user_id = v_site_user_id;
+    update registration_confirmation set redeemed = true
+        where site_user_id = v_site_user_id;
+    return 'success';
+end;
+$$ language plpgsql;
+revoke execute on function
+    confirm_registration(bigint, varchar, interval) from public;
+grant execute on function
+    confirm_registration(bigint, varchar, interval) to file_host_group;
 
 create function create_password_reset_entry(
     v_email varchar,
