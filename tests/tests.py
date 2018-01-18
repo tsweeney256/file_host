@@ -1,4 +1,5 @@
 import os
+import re
 import unittest
 from functools import partial
 from file_host import create_app
@@ -86,7 +87,12 @@ class MyTests(unittest.TestCase):
             assert num_expected_flashes == num_flashes, assert_msg
 
     def assertRedirect(self, response, page, code=None):
-        self.assertEqual(response.location, url_for(page))
+        match = re.match(
+            'http(s)?://{}'.format(current_app.config['SERVER_NAME']),
+            response.location)
+        loc = (response.location if match is None
+               else response.location[match.end(0):])
+        self.assertEqual(loc, url_for(page, _external=False))
         if code:
             self.assertEqual(response.status_code, code)
         else:
