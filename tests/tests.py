@@ -306,8 +306,8 @@ class MyTests(unittest.TestCase):
                          'Please check your inbox.')
         duplicate_flash = ('message',
                            'This email is already associated with an account')
-        user, password = 'blah@blah.blah', 'blah'
-        user2, password2 = 'hooplah@hoop.lah', 'hooplah'
+        user, password = 'blah@localhost', 'blah'
+        user2, password2 = 'hooplah@localhost', 'hooplah'
         # page is available
         resp = self.client.get(url_for('user.register'))
         self.assertEqual(resp.status_code, 200)
@@ -346,7 +346,7 @@ class MyTests(unittest.TestCase):
         self.assert_post_login(flashes=failure_flash, redirect_loc=None,
                                email='doesnt', password='exist')
         # test login of first user
-        test_user, test_pass = 'blah@blah.blah', 'blah'
+        test_user, test_pass = 'blah@localhost', 'blah'
         self.assert_post_login(flashes=success_flash,
                                redirect_loc='index.index', create_user=True,
                                email=test_user, password=test_pass)
@@ -354,7 +354,7 @@ class MyTests(unittest.TestCase):
         self.assert_post_login(flashes=failure_flash, redirect_loc=None,
                                email='doesnt', password='exist')
         # test login of second user
-        test_user2, test_pass2 = 'hooplah@hooplah.hooplah', 'hooplah'
+        test_user2, test_pass2 = 'hooplah@localhost', 'hooplah'
         self.assert_post_login(flashes=success_flash,
                                redirect_loc='index.index', create_user=True,
                                email=test_user2, password=test_pass2)
@@ -381,7 +381,7 @@ class MyTests(unittest.TestCase):
         resp = self.client.get(url_for('user.request_password_reset'))
         self.assertEqual(resp.status_code, 200)
         # test request for nonexistent account when empty
-        user, password = 'blah@blah.blah', 'blah'
+        user, password = 'blah@localhost', 'blah'
         self.assert_post_request_password_reset(
             flashes=nonexistent_flash, email=user)
         # test request for existing account
@@ -395,7 +395,7 @@ class MyTests(unittest.TestCase):
         self.assert_post_request_password_reset(
             flashes=nonexistent_flash, email='nonexistent')
         # test request for sexond existing account
-        user2, password2 = 'hooplah@hooplah.hooplah', 'hooplah'
+        user2, password2 = 'hooplah@localhost', 'hooplah'
         self.assert_post_request_password_reset(
             flashes=success_flash, email=user2, password=password2,
             create_user=True)
@@ -404,7 +404,7 @@ class MyTests(unittest.TestCase):
             flashes=existing_request, email=user)
 
     def test_reset_password(self):
-        user, password = 'blah@blah.blah', 'blah'
+        user, password = 'blah@localhost', 'blah'
         invalid_params = ('message',
                           'Invalid parameters. Future invalid attempts will '
                           'result in a ban')
@@ -470,7 +470,7 @@ class MyTests(unittest.TestCase):
             password=password, reset_url=second_url,
             redirect_loc='index.index')
         # Reset password of second user
-        user2, password2 = 'user2@user.com', 'password2'
+        user2, password2 = 'user2@localhost', 'password2'
         self.assert_post_reset_password(
             flashes=success, site_user_id=self.site_user_id+1, email=user2,
             password=password2, create_user=True, request_reset=True,
@@ -495,7 +495,7 @@ class MyTests(unittest.TestCase):
             redirect_loc='index.index')
         # Reject password mismatch and blank passwords
         pass_mismatch_url = self.assert_post_request_password_reset(
-            flashes=request_success, email="new@guy.com", password="hooplah",
+            flashes=request_success, email="new@localhost", password="hooplah",
             create_user=True)
         func = partial(self.assert_post_reset_password, redirect_loc=None,
                        reset_url=pass_mismatch_url,
