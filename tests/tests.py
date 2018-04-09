@@ -21,14 +21,17 @@ user_tables = [
 
 class TestRequestWrapper():
 
-    def __init__(self, context, view, *args, **kwargs):
+    def __init__(self, context, view, session=None, *args, **kwargs):
         self.context = context
+        self.session = session
         self._view = view
         self._args = args
         self._kwargs = kwargs
 
     def __enter__(self):
         self.context.__enter__()
+        if self.session:
+            self.context.session = self.session
         self.response = make_response(self._view(*self._args, **self._kwargs))
         return self
 
