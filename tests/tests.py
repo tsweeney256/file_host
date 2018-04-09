@@ -348,7 +348,7 @@ class MyTests(unittest.TestCase):
 
     def test_index(self):
         ret = self.client.get(url_for('index.index'))
-        self.assertRedirect(ret, 'user.login')
+        self.assertRedirect(ret, 'user.login', next='index.index')
         with self.app.test_request_context(url_for('index.index')):
             session['site_user_id'] = 1
             response = make_response(blueprints.index.views.index())
