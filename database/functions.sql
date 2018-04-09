@@ -5,7 +5,6 @@ create extension if not exists "pgcrypto";
 drop function if exists create_registration_confirmation_entry(
                                         v_site_user_id bigint);
 drop function if exists confirm_registration(bigint, varchar, interval);
-drop function if exists create_password_reset_entry(varchar, cidr);
 drop function if exists create_password_reset_entry(varchar, cidr, interval);
 drop function if exists reset_site_user_password(
                                         bigint, varchar, varchar, interval);
