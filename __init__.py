@@ -19,7 +19,7 @@ def create_app(settings_file):
     import file_host.blueprints.index.views as index_views
     app.register_blueprint(index_views.blueprint)
     import file_host.blueprints.user.views as user_views
-    app.register_blueprint(user_views.blueprint)
+    app.register_blueprint(user_views.blueprint, url_prefix='/user')
     return app
 
 
