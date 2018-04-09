@@ -45,14 +45,29 @@ class TestRequestWrapper():
 def follow_redirect(request_context, response):
     # This is probably hacky and bad, but I was left with no choice
     # TODO: Make this not hacky and bad
+    # Note: With the addition of multiple redirects and query args, this is
+    #       less bad, but there may be other environ fields that need to be
+    #       changed to make this proper, such as forms and content length
+    # TODO: Finish up proper multi redirect support, particularly query args
     app = request_context.app
     environ = request_context.request.environ
+    match = re.search(r'(?P<loc>[^\?]+)(\?(?P<query_args>.+))?',
+                      response.location)
+    response.location = match.group('loc')
+    query_arg_match = match.group('query_args')
+    query_args = query_arg_match
     endpoint, kwargs = request_context.url_adapter.match(
-        response.location, method='GET')
+        response.location, method='GET', query_args=query_args)
     original_method = environ['REQUEST_METHOD']
     environ['REQUEST_METHOD'] = 'GET'
     ret = app.make_response(app.view_functions[endpoint](**kwargs))
     environ['REQUEST_METHOD'] = original_method
+    if (hasattr(ret, 'location') and ret.location is not None):
+        # Note: This is not sufficient to detect a loop.
+        #       This does not detect transitive loops
+        if (ret.location == response.location):
+            raise RuntimeError('Infinite redirect loop detected')
+        ret = follow_redirect(request_context, ret)
     return ret
 
 
