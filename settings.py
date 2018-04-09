@@ -8,10 +8,8 @@ import getpass
 
 SERVER_NAME = 'localhost:5000'
 SECRET_KEY = 'secret'
-# Time until the registration confirmation period expires
-REG_CONFIRM_EXPR = '1 day'
-# Time until the password reset request expires
-PASS_RESET_EXPR = '1 day'
+# Time for email confirmations to expire
+CONFIRM_EXPR = '1 day'
 
 # Optional settings
 DEBUG = True  # Defaults to False

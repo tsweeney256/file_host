@@ -107,7 +107,7 @@ def confirm_registration(site_user_id, confirmation_url):
         db_cursor = db_connection.cursor()
         db_cursor.callproc('confirm_registration',
                            [site_user_id, confirmation_url,
-                            current_app.config['REG_CONFIRM_EXPR']])
+                            current_app.config['CONFIRM_EXPR']])
         proc_result = db_cursor.fetchone()[0]
         if proc_result == 'failure_wrong_id':
             abort(404)
@@ -126,7 +126,7 @@ def request_password_reset():
                           'create_password_reset_entry(%s, %s, %s) '
                           'as (a text, b bigint, c text);',
                           [request.form['email'], '127.0.0.1',
-                           current_app.config['PASS_RESET_EXPR']])
+                           current_app.config['CONFIRM_EXPR']])
         db_connection.commit()
         ret = db_cursor.fetchone()
         result_code = ret[0]
@@ -173,7 +173,7 @@ def reset_password(site_user_id, reset_url):
         password_hash = hasher.hash(request.form['password'])
         db_cursor.callproc('reset_site_user_password',
                            [site_user_id, reset_url, password_hash,
-                            current_app.config['PASS_RESET_EXPR']])
+                            current_app.config['CONFIRM_EXPR']])
         db_connection.commit()
         reset_password_code = db_cursor.fetchone()[0]
         if reset_password_code == 'failure_wrong_id':

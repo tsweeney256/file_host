@@ -406,12 +406,12 @@ class MyTests(unittest.TestCase):
             confirmation_url='bad', status_code=404)
 
         # fails when expired
-        original_expiration = current_app.config['REG_CONFIRM_EXPR']
-        current_app.config['REG_CONFIRM_EXPR'] = '0 days'
+        original_expiration = current_app.config['CONFIRM_EXPR']
+        current_app.config['CONFIRM_EXPR'] = '0 days'
         self.assert_get_confirm_registration(
             flashes=None, site_user_id=self.site_user_id,
             confirmation_url=second_url, status_code=404)
-        current_app.config['REG_CONFIRM_EXPR'] = original_expiration
+        current_app.config['CONFIRM_EXPR'] = original_expiration
         # confirm second user
         self.assert_get_confirm_registration(
             flashes=success_flash, site_user_id=self.site_user_id,
@@ -506,7 +506,7 @@ class MyTests(unittest.TestCase):
         expired_request = ('message', 'This password reset URL has already '
                            'expired. Please request another reset.')
 
-        true_reset_time = current_app.config['PASS_RESET_EXPR']
+        true_reset_time = current_app.config['CONFIRM_EXPR']
         # page is available
         resp = self.client.get(
             url_for('user.reset_password', site_user_id=0, reset_url=0))
@@ -516,12 +516,12 @@ class MyTests(unittest.TestCase):
             flashes=invalid_params, site_user_id=0, reset_url='0',
             email='nonexistent', password='whatever')
         # block expired request
-        current_app.config['PASS_RESET_EXPR'] = '0 days'
+        current_app.config['CONFIRM_EXPR'] = '0 days'
         first_url = self.assert_post_reset_password(
             flashes=expired_request, site_user_id=self.site_user_id+1,
             password=password, email=user, create_user=True,
             request_reset=True, redirect_loc='user.request_password_reset')
-        current_app.config['PASS_RESET_EXPR'] = true_reset_time
+        current_app.config['CONFIRM_EXPR'] = true_reset_time
         # Reset password
         self.assert_post_reset_password(
             flashes=success, site_user_id=self.site_user_id, password="new",
@@ -558,13 +558,13 @@ class MyTests(unittest.TestCase):
             password=password2, create_user=True, request_reset=True,
             redirect_loc='index.index')
         # block older reset_urls when newer exist
-        current_app.config['PASS_RESET_EXPR'] = '0 days'
+        current_app.config['CONFIRM_EXPR'] = '0 days'
         loop_urls = []
         num_loops = 5
         for i in range(num_loops):
             loop_urls.append(self.assert_post_request_password_reset(
                 flashes=request_success, email=user2))
-        current_app.config['PASS_RESET_EXPR'] = true_reset_time
+        current_app.config['CONFIRM_EXPR'] = true_reset_time
         for i in range(num_loops-1):
             self.assert_post_reset_password(
                 flashes=expired_request, site_user_id=self.site_user_id,
