@@ -74,6 +74,11 @@ def follow_redirect(request_context, response):
 
 class MyTests(unittest.TestCase):
 
+    def _get_super_app(self):
+        super_app = create_app(os.path.dirname(os.path.realpath(__file__)) +
+                               '/superuser_settings.py')
+        return super_app
+
     def assertFlashed(self, expected_flashes, assert_no_extra_flashes=True,
                       request_context=None):
         """Must be in a request context to call this function
@@ -291,8 +296,7 @@ class MyTests(unittest.TestCase):
 
         # Some might say its overkill to create a whole app just to load
         # superuser db settings. To that I say:
-        super_app = create_app(os.path.dirname(os.path.realpath(__file__)) +
-                               '/superuser_settings.py')
+        super_app = self._get_super_app()
         with super_app.app_context():
             with get_db_connection() as db:
                 cursor = db.cursor()
