@@ -35,6 +35,8 @@ def _is_valid_password(pass1, pass2):
 def login():
     this_page = 'user/login.html'
     if request.method == 'POST':
+        next_loc = request.args.get(
+            'next', default=url_for('index.index'), type='str')
         hasher = PasswordHasher()
         db_connection = get_db_connection()
         db_cursor = db_connection.cursor()
@@ -51,7 +53,7 @@ def login():
         try:
             hasher.verify(db_password, request.form['password'])
             _login(db_user_id)
-            return redirect(url_for('index.index'))
+            return redirect(next_loc)
         except VerifyMismatchError:
             flash('Invalid email or password')
             render_template(this_page)

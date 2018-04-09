@@ -1,6 +1,7 @@
 import os
 import re
 import unittest
+import urllib
 from functools import partial
 from file_host import create_app
 from werkzeug.exceptions import NotFound
@@ -103,13 +104,16 @@ class MyTests(unittest.TestCase):
                           .format(str(flashes)))
             assert num_expected_flashes == num_flashes, assert_msg
 
-    def assertRedirect(self, response, page, code=None):
+    def assertRedirect(self, response, page, code=None, next=None):
         match = re.match(
             'http(s)?://{}'.format(current_app.config['SERVER_NAME']),
             response.location)
-        loc = (response.location if match is None
-               else response.location[match.end(0):])
-        self.assertEqual(loc, url_for(page, _external=False))
+        loc = urllib.parse.unquote((response.location if match is None
+                                    else response.location[match.end(0):]))
+        url = url_for(page, _external=False)
+        if (next):
+            url += '?next=' + url_for(next, _external=True)
+        self.assertEqual(loc, url)
         if code:
             self.assertEqual(response.status_code, code)
         else:

@@ -1,5 +1,6 @@
 import psycopg2
-from flask import current_app, g
+from functools import wraps
+from flask import current_app, g, redirect, request, session, url_for
 
 
 def get_db_connection():
@@ -18,3 +19,12 @@ def get_db_connection():
             db_connection_string += 'host={} '.format(config['DBHOST'])
         g.db = psycopg2.connect(db_connection_string)
     return g.db
+
+
+def login_required(f):
+    @wraps(f)
+    def handle_login_requirement(*args, **kwargs):
+        if 'site_user_id' not in session:
+            return redirect(url_for('user.login', next=request.url))
+        return f(*args, **kwargs)
+    return handle_login_requirement
