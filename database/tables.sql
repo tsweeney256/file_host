@@ -84,7 +84,7 @@ create table password_reset (
     password_reset_id bigserial primary key,
     site_user_id bigint not null references site_user(site_user_id),
     ip cidr not null,
-    url varchar(24),
+    url varchar(24) unique not null,
     date_added timestamp not null default now_utc(),
     redeemed boolean not null default false
 );
