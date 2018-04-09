@@ -10,6 +10,7 @@ drop function if exists reset_site_user_password(
                                         bigint, varchar, varchar, interval);
 drop function if exists create_email_reset_entry(
                                         bigint, varchar, cidr, interval);
+drop function if exists reset_site_user_email(bigint, varchar, interval);
 drop function if exists random_url(int);
 reset client_min_messages;
 
@@ -204,4 +205,51 @@ revoke execute on function
 grant execute on function
     create_email_reset_entry(bigint, varchar, cidr, interval)
     to file_host_group;
+
+create function reset_site_user_email(
+    v_site_user_id bigint,
+    v_reset_url varchar,
+    v_expire_after interval) returns varchar as $$
+declare
+    v_entry record;
+    v_most_recent_entry record;
+    v_most_recent_reset_url varchar;
+    v_ret record;
+begin
+    select * into v_entry from email_reset
+        where site_user_id = v_site_user_id and url = v_reset_url;
+    if not found then
+        return 'failure_wrong_id';
+    end if;
+    select * into v_most_recent_entry from email_reset
+        where site_user_id = v_site_user_id
+        order by email_reset_id desc limit 1;
+    if v_entry.redeemed is true then
+        if v_most_recent_entry.redeemed is true then
+            return 'failure_redeemed';
+        else
+            return 'failure_redeemed_existing_request';
+        end if;
+    elseif now_utc() > v_entry.date_added + v_expire_after then
+        if v_entry.email_reset_id = v_most_recent_entry.email_reset_id or
+           v_most_recent_entry.redeemed is true then
+            return 'failure_expired';
+        else
+            return 'failure_expired_existing_request';
+        end if;
+    end if;
+    update site_user set email = v_entry.new_email
+        where site_user_id = v_site_user_id;
+    update email_reset set redeemed = true
+        where email_reset_id = v_entry.email_reset_id;
+    return 'success';
+end;
+$$ language plpgsql;
+revoke execute on function
+    reset_site_user_email(bigint, varchar, interval)
+    from public;
+grant execute on function
+    reset_site_user_email(bigint, varchar, interval)
+    to file_host_group;
+
 commit;

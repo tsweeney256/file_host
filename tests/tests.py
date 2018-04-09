@@ -245,6 +245,36 @@ class MyTests(unittest.TestCase):
             self.assertFlashed(flashes, no_extra_flashes)
             self.assertEqual(ret.response.status_code, status_code)
             return g.email_reset_url
+
+    def assert_post_reset_email(
+            self, flashes, new_email, password=None, old_email=None,
+            site_user_id=None, reset_url=None, status_code=200,
+            create_user=False, request_reset=False, redirect_loc=None,
+            login=False):
+        if create_user:
+            self.post_registration(old_email, password).run()
+            self.site_user_id += 1
+        if site_user_id is None:
+            site_user_id = self.site_user_id
+        generated_url = None
+        if request_reset:
+            with self.post_request_email_reset(
+                    new_email, password,
+                    session={'site_user_id': site_user_id}):
+                generated_url = g.email_reset_url
+        if reset_url is None:
+            reset_url = generated_url
+        with self.post_reset_email(site_user_id, reset_url) as ret:
+            response = ret.response
+            if redirect_loc:
+                # self.assertRedirect(response, redirect_loc)
+                response = ret.follow_redirect()
+            self.assertFlashed(flashes)
+            self.assertEqual(response.status_code, status_code)
+        if login:
+            self.assert_post_login(None, 'index.index', new_email, password)
+        return reset_url
+
     def post_registration(self, email, password, password_confirmation=None):
         if password_confirmation is None:
             password_confirmation = password
@@ -733,6 +763,142 @@ class MyTests(unittest.TestCase):
         self.assert_post_request_email_reset(
             existing_request_flash, new_success_email, 'password',
             old_email=old_success_email, site_user_id=success_id)
+
+    def test_reset_email(self):
+        request_success_flash = (
+            'message',
+            'Your email reset request has been sent. Please check '
+            'your email for further instructions.')
+        success_flash = (
+            'message',
+            'Your email has been reset and you have been signed in.')
+        wrongid_flash = (
+            'message',
+            'Invalid parameters. Future invalid attempts will result in '
+            'a ban')
+        redeemed_flash = (
+            'message',
+            'This email reset URL has already been used to reset '
+            'your email. Please request another reset.')
+        expired_flash = (
+            'message',
+            'This email reset URL has already expired. Please '
+            'request another reset.')
+        redeemed_existing_flash = (
+            'message',
+            'This email reset URL has already been used to reset '
+            'your email. You have already filed a new request to '
+            'reset your email. Please check your current email for '
+            'further instructions.')
+        expired_existing_flash = (
+            'message',
+            'This email reset URL has expired. You already have a '
+            'valid unused email reset request. Please check your '
+            'email for further instructions.')
+
+        # reset email
+        success_old_email = 'old@localhost'
+        success_new_email = 'new@localhost'
+        success_password = 'password'
+        self.assert_post_reset_email(
+            success_flash, success_new_email, success_password,
+            old_email=success_old_email, create_user=True, request_reset=True,
+            redirect_loc='index.index', login=True)
+        self.site_user_id
+
+        # reject wrong site_user_id
+        wrongid_old_email = 'oldwrongid@localhost'
+        wrongid_new_email = 'newwrongid@localhost'
+        wrongid_password = 'wrongidpasword'
+        wrongid_url = self.assert_post_request_email_reset(
+            request_success_flash, wrongid_new_email, wrongid_password,
+            site_user_id=None, old_email=wrongid_old_email, create_user=True)
+        self.assert_post_reset_email(
+            wrongid_flash, wrongid_new_email, reset_url=wrongid_url,
+            site_user_id=0)
+
+        # reject wrong reset url
+        self.assert_post_reset_email(
+            wrongid_flash, wrongid_new_email, reset_url='blah')
+
+        # reject wrong site_user_id and reset url
+        self.assert_post_reset_email(
+            wrongid_flash, wrongid_new_email, reset_url='blah',
+            site_user_id=0)
+
+        # reject using reset url of different user
+        expire_redeem_old_email = 'oldexpireredeem@localhost'
+        expire_redeem_new_email = 'newexpireredeem@localhost'
+        expire_redeem_password = 'password'
+        expire_redeem_url = self.assert_post_request_email_reset(
+            request_success_flash, expire_redeem_new_email,
+            expire_redeem_password, old_email=expire_redeem_old_email,
+            create_user=True)
+        self.assert_post_reset_email(
+            wrongid_flash, expire_redeem_new_email, reset_url=wrongid_url)
+
+        # reject expired url
+        current_app.config['CONFIRM_EXPR'] = '0 days'
+        self.assert_post_reset_email(
+            expired_flash, expire_redeem_new_email, expire_redeem_password,
+            reset_url=expire_redeem_url,
+            redirect_loc='user.request_email_reset')
+        current_app.config['CONFIRM_EXPR'] = '1 days'
+
+        # reject redeemed url
+        self.assert_post_reset_email(
+            success_flash, expire_redeem_new_email, expire_redeem_password,
+            reset_url=expire_redeem_url, login=True,
+            redirect_loc='index.index')
+        self.assert_post_reset_email(
+            redeemed_flash, expire_redeem_new_email,
+            reset_url=expire_redeem_url,
+            redirect_loc='user.request_email_reset')
+
+        # reject redeemed url when there is an existing request
+        redeemed_existing_old_email = expire_redeem_new_email
+        redeemed_existing_new_email = 'newredeemedexisting@localhost'
+        redeemed_existing_password = expire_redeem_password
+        redeemed_existing_url = self.assert_post_request_email_reset(
+            request_success_flash, redeemed_existing_new_email,
+            redeemed_existing_password,
+            old_email=redeemed_existing_old_email)
+        self.assert_post_reset_email(
+            redeemed_existing_flash, redeemed_existing_new_email,
+            redeemed_existing_password, reset_url=expire_redeem_url)
+
+        # reject expired url when there is an existing valid request
+        expired_existing_old_email = 'expiredexistingold@localhost'
+        expired_existing_new_email = 'exiredexistingnew@localhost'
+        expired_existing_password = 'expiredexistingpassword'
+        expired_url = self.assert_post_request_email_reset(
+            request_success_flash, expired_existing_new_email,
+            expired_existing_password,
+            old_email=expired_existing_old_email, create_user=True)
+        # need to to change date in db manually because the CONFIRM_EXPR trick
+        # wont work here since we need a valid url too
+        super_app = self._get_super_app()
+        with super_app.app_context():
+            with get_db_connection() as db:
+                cursor = db.cursor()
+                cursor.execute(
+                    "update email_reset set date_added = '1900-1-1' "
+                    "where url = '" + expired_url + "'")
+        good_expired_existing_url = self.assert_post_request_email_reset(
+            request_success_flash, expired_existing_new_email,
+            expired_existing_password,
+            old_email=expired_existing_old_email)
+        self.assert_post_reset_email(
+            expired_existing_flash, expired_existing_new_email,
+            expired_existing_password,
+            reset_url=expired_url)
+        # now redeem the good url because why not
+        self.assert_post_reset_email(
+            success_flash, expired_existing_new_email,
+            expired_existing_password,
+            reset_url=good_expired_existing_url,
+            redirect_loc='index.index')
+
 
 if __name__ == '__main__':
     unittest.main()
