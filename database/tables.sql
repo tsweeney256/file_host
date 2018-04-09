@@ -11,12 +11,15 @@ alter table if exists login
     drop constraint if exists login_site_user_id_fkey;
 alter table if exists password_reset
     drop constraint if exists password_reset_site_user_id_fkey;
-drop table if exists registration_confirmation;
-drop table if exists site_user;
-drop table if exists site_user_status;
+alter table if exists email_reset
+    drop constraint if exists email_reset_site_user_id_fkey;
 drop table if exists file;
 drop table if exists login;
+drop table if exists registration_confirmation;
 drop table if exists password_reset;
+drop table if exists email_reset;
+drop table if exists site_user;
+drop table if exists site_user_status;
 drop function if exists now_utc();
 reset client_min_messages;
 
@@ -89,5 +92,16 @@ create table password_reset (
     redeemed boolean not null default false
 );
 grant select, insert, update on table password_reset to file_host_group;
+
+create table email_reset (
+    email_reset_id bigserial primary key,
+    site_user_id bigint not null references site_user(site_user_id),
+    new_email varchar not null,
+    ip cidr not null,
+    url varchar unique not null,
+    date_added timestamp not null default now_utc(),
+    redeemed boolean not null default false
+);
+grant select, insert, update on table email_reset to file_host_group;
 
 commit;

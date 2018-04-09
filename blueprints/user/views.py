@@ -3,7 +3,7 @@ from argon2 import PasswordHasher
 from psycopg2 import IntegrityError
 from validate_email import validate_email
 from argon2.exceptions import VerifyMismatchError
-from file_host.helpers import get_db_connection
+from file_host.helpers import get_db_connection, login_required
 from flask import (abort, Blueprint, current_app, flash, g, redirect, request,
                    session, render_template, url_for)
 
@@ -207,4 +207,75 @@ def reset_password(site_user_id, reset_url):
             flash(reset_password_code)
             # TODO: Actually email the admin with an error report
             return render_template(this_page)
+    return render_template(this_page)
+
+
+@blueprint.route('/email_reset/', methods=['GET', 'POST'])
+@login_required
+def request_email_reset():
+    this_page = 'user/request_email_reset.html'
+    if request.method == 'POST':
+        with get_db_connection() as db_connection:
+            if not validate_email(request.form['new_email']):
+                flash('Invalid email.')
+                return render_template(this_page)
+            db_cursor = db_connection.cursor()
+            db_cursor.execute('select email, password from site_user '
+                              'where site_user_id=%s;',
+                              [session['site_user_id']])
+            email, password_hash = db_cursor.fetchone()
+            hasher = PasswordHasher()
+            try:
+                hasher.verify(password_hash, request.form['password'])
+            except VerifyMismatchError:
+                flash('Incorrect password')
+                return render_template(this_page)
+            db_cursor.execute('select a,b from '
+                              'create_email_reset_entry(%s, %s, %s, %s) '
+                              'as (a text, b text);',
+                              [session['site_user_id'],
+                               request.form['new_email'], '127.0.0.1',
+                               current_app.config['CONFIRM_EXPR']])
+            status_code, g.email_reset_url = db_cursor.fetchone()
+            if status_code == 'success':
+                mail_msg = Message(
+                    'Email Reset', recipients=[email])
+                mail_msg.html = ('Please click the below link to reset '
+                                 'your email. After you do so, you will '
+                                 'receive another confirmation at {3} '
+                                 'before the change is finalized. '
+                                 '<br><a href={0}/email_reset/{1}/{2}>'
+                                 '{0}/password_reset/{1}/{2}</a>'
+                                 '<br>If you did not request to change your '
+                                 'email, your account has been compromised. '
+                                 'If this is the case, click this link to '
+                                 'change your password: '
+                                 '<br><a href={0}/password_reset/>'
+                                 '{0}/password_reset/</a>'
+                                 .format(current_app.config['SERVER_NAME'],
+                                         session['site_user_id'],
+                                         g.email_reset_url,
+                                         request.form['new_email']))
+                current_app.config['mail'].send(mail_msg)
+                flash('Your email reset request has been sent. Please check '
+                      'your email for further instructions.')
+                return render_template(this_page)
+            elif status_code == 'failure_wrong_password':
+                flash('Wrong password.')
+                return render_template(this_page)
+            elif status_code == 'failure_new_email_in_use':
+                flash('The email you wish to use is already associated with '
+                      'an account.')
+                return render_template(this_page)
+            elif status_code == 'failure_existing_request':
+                flash('A request to reset the given account\'s email has '
+                      'already been filed. Please check your current email '
+                      'for instructions.')
+                return render_template(this_page)
+            else:
+                flash('An unknown error occurred. The administrator has '
+                      'automatically been notified. Please try again later.')
+                # TODO: Actually email the admin with an error report
+                return render_template(this_page)
+
     return render_template(this_page)

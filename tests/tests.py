@@ -15,6 +15,7 @@ user_tables = [
     'login',
     'password_reset',
     'registration_confirmation',
+    'email_reset',
     'site_user',
 ]
 
@@ -226,6 +227,24 @@ class MyTests(unittest.TestCase):
                 email=email, password=password)
         return generated_reset_url
 
+    def assert_post_request_email_reset(
+            self, flashes, new_email, password, site_user_id=None,
+            old_email=None, status_code=200, create_user=False, login=True,
+            no_extra_flashes=True):
+        if create_user:
+            self.post_registration(old_email, password).run()
+            self.site_user_id += 1
+        if site_user_id is None:
+            site_user_id = self.site_user_id
+        if login:
+            with self.post_login(old_email, password) as ret:
+                self.assertEqual(session['site_user_id'], site_user_id)
+        with self.post_request_email_reset(
+                new_email, password,
+                session={'site_user_id': site_user_id}) as ret:
+            self.assertFlashed(flashes, no_extra_flashes)
+            self.assertEqual(ret.response.status_code, status_code)
+            return g.email_reset_url
     def post_registration(self, email, password, password_confirmation=None):
         if password_confirmation is None:
             password_confirmation = password
@@ -281,6 +300,26 @@ class MyTests(unittest.TestCase):
                 'password_confirmation': password_confirmation
             })
         return TestRequestWrapper(ctx, blueprints.user.views.reset_password,
+                                  site_user_id=site_user_id,
+                                  reset_url=reset_url)
+
+    def post_request_email_reset(self, new_email, password, session=None):
+        ctx = self.app.test_request_context(
+            url_for('user.request_email_reset'),
+            method='POST',
+            data={
+                'new_email': new_email,
+                'password': password
+            })
+        return TestRequestWrapper(
+            ctx, blueprints.user.views.request_email_reset, session)
+
+    def post_reset_email(self, site_user_id, reset_url):
+        ctx = self.app.test_request_context(
+            url_for('user.reset_email', site_user_id=site_user_id,
+                    reset_url=reset_url),
+            method='POST')
+        return TestRequestWrapper(ctx, blueprints.user.views.reset_email,
                                   site_user_id=site_user_id,
                                   reset_url=reset_url)
 
@@ -611,6 +650,89 @@ class MyTests(unittest.TestCase):
         self.assert_passwords_mismatch(func)
         self.assert_password_blank(func)
 
+    def test_request_email_reset(self):
+        success_flash = (
+            'message',
+            'Your email reset request has been sent. Please check '
+            'your email for further instructions.')
+        incorrect_password_flash = (
+            'message',
+            'Incorrect password')
+        email_exists_flash = (
+            'message',
+            'The email you wish to use is already associated with an account.')
+        existing_request_flash = (
+            'message',
+            'A request to reset the given account\'s email has '
+            'already been filed. Please check your current email '
+            'for instructions.')
+
+        # page redirects to login page if not signed in
+        response = self.client.get(url_for('user.request_email_reset'))
+        self.assertRedirect(response, 'user.login',
+                            next='user.request_email_reset')
+
+        # page is available if signed in
+        with self.app.test_request_context(
+                url_for('user.request_email_reset')):
+            session['site_user_id'] = 400
+            response = make_response(
+                blueprints.user.views.request_email_reset())
+            response = self.app.process_response(response)
+            self.assertEqual(response.status_code, 200)
+
+        # reset email
+        new_success_email = 'new@localhost'
+        old_success_email = 'old@localhost'
+        success_password = 'password'
+        self.assert_post_request_email_reset(
+            success_flash, new_success_email, success_password,
+            old_email=old_success_email, create_user=True)
+        success_id = self.site_user_id
+
+        # reject wrong password
+        old_badpass_email = 'badpass@localhost'
+        new_badpass_email = 'newbadpass@localhost'
+        badpass_password = 'password'
+        self.post_registration(
+            email=old_badpass_email, password=badpass_password).run()
+        self.site_user_id += 1
+        self.assert_post_request_email_reset(
+            incorrect_password_flash, new_badpass_email, 'badpass',
+            login=False)
+
+        # reject switch to email already in use
+        self.assert_post_request_email_reset(
+            email_exists_flash, old_success_email, 'password',
+            old_email=old_badpass_email)
+
+        # reject switch to same email
+        same_email = 'same@localhost'
+        same_password = 'password'
+        self.post_registration(same_email, same_password).run()
+        self.site_user_id += 1
+        self.assert_post_request_email_reset(
+            email_exists_flash, same_email, 'password',
+            old_email=same_email)
+
+        # reject request when another is already pending for the account
+        self.assert_post_request_email_reset(
+            existing_request_flash, new_success_email, 'password',
+            old_email=old_success_email, site_user_id=success_id)
+
+        current_app.config['CONFIRM_EXPR'] = '0 days'
+
+        # accept request when a previous pending request expired
+        self.assert_post_request_email_reset(
+            success_flash, new_success_email, 'password',
+            old_email=old_success_email, site_user_id=success_id)
+
+        current_app.config['CONFIRM_EXPR'] = '1 days'
+
+        # reject again
+        self.assert_post_request_email_reset(
+            existing_request_flash, new_success_email, 'password',
+            old_email=old_success_email, site_user_id=success_id)
 
 if __name__ == '__main__':
     unittest.main()

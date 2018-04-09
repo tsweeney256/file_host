@@ -8,6 +8,8 @@ drop function if exists confirm_registration(bigint, varchar, interval);
 drop function if exists create_password_reset_entry(varchar, cidr, interval);
 drop function if exists reset_site_user_password(
                                         bigint, varchar, varchar, interval);
+drop function if exists create_email_reset_entry(
+                                        bigint, varchar, cidr, interval);
 drop function if exists random_url(int);
 reset client_min_messages;
 
@@ -160,4 +162,46 @@ grant execute on function
     reset_site_user_password(bigint, varchar, varchar, interval)
     to file_host_group;
 
+create function create_email_reset_entry(
+    v_site_user_id bigint,
+    v_new_email varchar,
+    v_ip cidr,
+    v_expire_after interval) returns record as $$
+declare
+    v_ret record;
+    v_url text;
+begin
+    perform from site_user where email = v_new_email;
+    if found then
+        select 'failure_new_email_in_use', null::text
+            into v_ret;
+        return v_ret;
+    end if;
+    perform from email_reset
+        where site_user_id = v_site_user_id and
+        redeemed = false and
+        now_utc() < date_added + v_expire_after;
+    if found then
+        select 'failure_existing_request', null::text
+            into v_ret;
+        return v_ret;
+    end if;
+    loop
+    begin
+        select random_url(18) into v_url;
+        insert into email_reset (site_user_id, new_email, url, ip)
+            values (v_site_user_id, v_new_email, v_url, v_ip);
+        select 'success', v_url into v_ret;
+        return v_ret;
+    exception when unique_violation then --loop again
+    end;
+    end loop;
+end;
+$$ language plpgsql;
+revoke execute on function
+    create_email_reset_entry(bigint, varchar, cidr, interval)
+    from public;
+grant execute on function
+    create_email_reset_entry(bigint, varchar, cidr, interval)
+    to file_host_group;
 commit;
