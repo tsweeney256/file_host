@@ -21,6 +21,10 @@ def get_db_connection():
     return g.db
 
 
+def get_index_str():
+    return current_app.config['INDEX']
+
+
 def login_required(f):
     @wraps(f)
     def handle_login_requirement(*args, **kwargs):

@@ -13,6 +13,7 @@ CONFIRM_EXPR = '1 day'
 
 # Optional settings
 DEBUG = True  # Defaults to False
+INDEX = 'index.index'  # Defaults to 'index.index'
 
 # PostgreSQL connection settings
 # Refer to PostgreSQL's documentation for connection defaults

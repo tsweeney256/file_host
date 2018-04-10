@@ -3,7 +3,7 @@ from argon2 import PasswordHasher
 from psycopg2 import IntegrityError
 from validate_email import validate_email
 from argon2.exceptions import VerifyMismatchError
-from file_host.helpers import get_db_connection, login_required
+from file_host.helpers import get_db_connection, get_index_str, login_required
 from flask import (abort, Blueprint, current_app, flash, g, redirect, request,
                    session, render_template, url_for)
 
@@ -36,7 +36,7 @@ def login():
     this_page = 'user/login.html'
     if request.method == 'POST':
         next_loc = request.args.get(
-            'next', default=url_for('index.index'), type='str')
+            'next', default=url_for(get_index_str()), type='str')
         hasher = PasswordHasher()
         db_connection = get_db_connection()
         db_cursor = db_connection.cursor()
@@ -115,7 +115,7 @@ def confirm_registration(site_user_id, confirmation_url):
             abort(404)
         flash('Registration confirmed. You have automatically been signed in')
         _login(site_user_id)
-    return redirect(url_for('index.index'))
+    return redirect(url_for(get_index_str()))
 
 
 @blueprint.route('/password_reset/', methods=['GET', 'POST'])
@@ -200,7 +200,7 @@ def reset_password(site_user_id, reset_url):
         elif reset_password_code == 'success':
             flash('Your password has been reset and you have been signed in.')
             _login(site_user_id)
-            return redirect(url_for('index.index'))
+            return redirect(url_for(get_index_str()))
         else:
             flash('An unknown error occurred. The administrator has '
                   'automatically been notified. Please try again later.')
@@ -318,7 +318,7 @@ def reset_email(site_user_id, reset_url):
             elif status_code == 'success':
                 flash('Your email has been reset and you have been signed in.')
                 _login(site_user_id)
-                return redirect(url_for('index.index'))
+                return redirect(url_for(get_index_str()))
             else:
                 flash('An unknown error occurred. The administrator has '
                       'automatically been notified. Please try again later.')
