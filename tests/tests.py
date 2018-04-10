@@ -71,7 +71,8 @@ def follow_redirect(request_context, response):
         # Note: This is not sufficient to detect a loop.
         #       This does not detect transitive loops
         if (ret.location == response.location):
-            raise RuntimeError('Infinite redirect loop detected')
+            raise RuntimeError('Infinite redirect loop detected\n' +
+                               ret.location + ' ' + response.location)
         ret = follow_redirect(request_context, ret)
     return ret
 
