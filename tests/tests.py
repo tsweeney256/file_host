@@ -198,7 +198,7 @@ class MyTests(unittest.TestCase):
             else:
                 return None
 
-    def assert_post_reset_password(
+    def assert_get_reset_password(
             self, flashes, site_user_id, password, reset_url=None,
             email=None, login=False, password_confirmation=None,
             redirect_loc=None, status_code=200, create_user=False,
@@ -212,7 +212,7 @@ class MyTests(unittest.TestCase):
                 generated_reset_url = g.password_reset_url
         if reset_url is None:
             reset_url = generated_reset_url
-        with self.post_reset_password(site_user_id, reset_url, password,
+        with self.get_reset_password(site_user_id, reset_url, password,
                                       password_confirmation) as ret:
             response = ret.response
             if redirect_loc:
@@ -318,7 +318,7 @@ class MyTests(unittest.TestCase):
         return TestRequestWrapper(
             ctx, blueprints.user.views.request_password_reset)
 
-    def post_reset_password(self, site_user_id, reset_url, password,
+    def get_reset_password(self, site_user_id, reset_url, password,
                             password_confirmation=None):
         if password_confirmation is None:
             password_confirmation = password
@@ -349,7 +349,7 @@ class MyTests(unittest.TestCase):
         ctx = self.app.test_request_context(
             url_for('user.reset_email', site_user_id=site_user_id,
                     reset_url=reset_url),
-            method='POST')
+            method='GET')
         return TestRequestWrapper(ctx, blueprints.user.views.reset_email,
                                   site_user_id=site_user_id,
                                   reset_url=reset_url)
@@ -608,48 +608,48 @@ class MyTests(unittest.TestCase):
             url_for('user.reset_password', site_user_id=0, reset_url=0))
         self.assertEqual(resp.status_code, 200)
         # block invalid site_user_id and reset_url
-        self.assert_post_reset_password(
+        self.assert_get_reset_password(
             flashes=invalid_params, site_user_id=0, reset_url='0',
             email='nonexistent', password='whatever')
         # block expired request
         current_app.config['CONFIRM_EXPR'] = '0 days'
-        first_url = self.assert_post_reset_password(
+        first_url = self.assert_get_reset_password(
             flashes=expired_request, site_user_id=self.site_user_id+1,
             password=password, email=user, create_user=True,
             request_reset=True, redirect_loc='user.request_password_reset')
         current_app.config['CONFIRM_EXPR'] = true_reset_time
         # Reset password
-        self.assert_post_reset_password(
+        self.assert_get_reset_password(
             flashes=success, site_user_id=self.site_user_id, password="new",
             email=user, login=True, reset_url=first_url,
             redirect_loc=get_index_str())
         # block redeemed request
-        self.assert_post_reset_password(
+        self.assert_get_reset_password(
             flashes=redeemed, site_user_id=self.site_user_id,
             password=password, reset_url=first_url,
             redirect_loc='user.request_password_reset')
         # block invalid reset_url with existing user_id and no valid request
-        self.assert_post_reset_password(
+        self.assert_get_reset_password(
             flashes=invalid_params, site_user_id=self.site_user_id,
             password=password, reset_url='0')
         # block invalid reset_url with existing user_id and valid request
         second_url = self.assert_post_request_password_reset(
             flashes=request_success, email=user)
-        self.assert_post_reset_password(
+        self.assert_get_reset_password(
             flashes=invalid_params, site_user_id=self.site_user_id,
             password=password, reset_url='0')
         # block redeemed request when valid request exists
-        self.assert_post_reset_password(
+        self.assert_get_reset_password(
             flashes=redeemed_existing, site_user_id=self.site_user_id,
             password=password, reset_url=first_url)
         # Reset second password
-        self.assert_post_reset_password(
+        self.assert_get_reset_password(
             flashes=success, site_user_id=self.site_user_id,
             password=password, reset_url=second_url,
             redirect_loc=get_index_str())
         # Reset password of second user
         user2, password2 = 'user2@localhost', 'password2'
-        self.assert_post_reset_password(
+        self.assert_get_reset_password(
             flashes=success, site_user_id=self.site_user_id+1, email=user2,
             password=password2, create_user=True, request_reset=True,
             redirect_loc=get_index_str())
@@ -662,12 +662,12 @@ class MyTests(unittest.TestCase):
                 flashes=request_success, email=user2))
         current_app.config['CONFIRM_EXPR'] = true_reset_time
         for i in range(num_loops-1):
-            self.assert_post_reset_password(
+            self.assert_get_reset_password(
                 flashes=expired_request, site_user_id=self.site_user_id,
                 password="something", reset_url=loop_urls[i],
                 redirect_loc='user.request_password_reset')
         # Reset newest password when older ones exist
-        self.assert_post_reset_password(
+        self.assert_get_reset_password(
             flashes=success, site_user_id=self.site_user_id,
             password="new", reset_url=loop_urls[-1],
             redirect_loc=get_index_str())
@@ -675,7 +675,7 @@ class MyTests(unittest.TestCase):
         pass_mismatch_url = self.assert_post_request_password_reset(
             flashes=request_success, email="new@localhost", password="hooplah",
             create_user=True)
-        func = partial(self.assert_post_reset_password, redirect_loc=None,
+        func = partial(self.assert_get_reset_password, redirect_loc=None,
                        reset_url=pass_mismatch_url,
                        site_user_id=self.site_user_id)
         self.assert_passwords_mismatch(func)

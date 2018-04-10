@@ -284,48 +284,50 @@ def request_email_reset():
     return render_template(this_page)
 
 
+# TODO: you managed to forget to actually require a second confirmation
+#       from the new email. Good Job.
+# TODO: email should create password reset request, voiding any previous
 @blueprint.route('/email_reset/<site_user_id>/<reset_url>')
 def reset_email(site_user_id, reset_url):
     this_page = 'user/reset_email.html'
-    if request.method == 'POST':
-        with get_db_connection() as db_connection:
-            db_cursor = db_connection.cursor()
-            db_cursor.callproc('reset_site_user_email',
-                               [site_user_id, reset_url,
-                                current_app.config['CONFIRM_EXPR']])
-            status_code = db_cursor.fetchone()[0]
-            if status_code == 'failure_wrong_id':
-                flash('Invalid parameters. Future invalid attempts will '
-                      'result in a ban')
-                # TODO: Actually log and act on fishy activity
-                return render_template(this_page)
-            elif status_code == 'failure_expired':
-                flash('This email reset URL has already expired. Please '
-                      'request another reset.')
-                return redirect(url_for('user.request_email_reset'))
-            elif status_code == 'failure_redeemed':
-                flash('This email reset URL has already been used to reset '
-                      'your email. Please request another reset.')
-                return redirect(url_for('user.request_email_reset'))
-            elif status_code == 'failure_redeemed_existing_request':
-                flash('This email reset URL has already been used to reset '
-                      'your email. You have already filed a new request to '
-                      'reset your email. Please check your current email for '
-                      'further instructions.')
-                return render_template(this_page)
-            elif status_code == 'failure_expired_existing_request':
-                flash('This email reset URL has expired. You already have a '
-                      'valid unused email reset request. Please check your '
-                      'email for further instructions.')
-                return render_template(this_page)
-            elif status_code == 'success':
-                flash('Your email has been reset and you have been signed in.')
-                _login(site_user_id)
-                return redirect(url_for(get_index_str()))
-            else:
-                flash('An unknown error occurred. The administrator has '
-                      'automatically been notified. Please try again later.')
-                flash(status_code)
-                # TODO: Actually email the admin with an error report
-                return render_template(this_page)
+    with get_db_connection() as db_connection:
+        db_cursor = db_connection.cursor()
+        db_cursor.callproc('reset_site_user_email',
+                           [site_user_id, reset_url,
+                            current_app.config['CONFIRM_EXPR']])
+        status_code = db_cursor.fetchone()[0]
+        if status_code == 'failure_wrong_id':
+            flash('Invalid parameters. Future invalid attempts will '
+                  'result in a ban')
+            # TODO: Actually log and act on fishy activity
+            return render_template(this_page)
+        elif status_code == 'failure_expired':
+            flash('This email reset URL has already expired. Please '
+                  'request another reset.')
+            return redirect(url_for('user.request_email_reset'))
+        elif status_code == 'failure_redeemed':
+            flash('This email reset URL has already been used to reset '
+                  'your email. Please request another reset.')
+            return redirect(url_for('user.request_email_reset'))
+        elif status_code == 'failure_redeemed_existing_request':
+            flash('This email reset URL has already been used to reset '
+                  'your email. You have already filed a new request to '
+                  'reset your email. Please check your current email for '
+                  'further instructions.')
+            return render_template(this_page)
+        elif status_code == 'failure_expired_existing_request':
+            flash('This email reset URL has expired. You already have a '
+                  'valid unused email reset request. Please check your '
+                  'email for further instructions.')
+            return render_template(this_page)
+        elif status_code == 'success':
+            flash('Your email has been reset and you have been signed in.')
+            _login(site_user_id)
+            return redirect(url_for(get_index_str()))
+        else:
+            flash('An unknown error occurred. The administrator has '
+                  'automatically been notified. Please try again later.')
+            flash(status_code)
+            # TODO: Actually email the admin with an error report
+            return render_template(this_page)
     return render_template(this_page)
