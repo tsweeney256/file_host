@@ -88,13 +88,14 @@ def register():
                 'create_registration_confirmation_entry', [new_site_user_id])
             registration_confirmation_url = db_cursor.fetchone()[0]
             mail_msg = Message('Welcome', recipients=[request.form['email']])
-            mail_msg.html = ('Please click the following link to complete '
-                             'your registration: '
-                             '<br><a href={0}/register/{1}/{2}>'
-                             '{0}/register/{1}/{2}</a>'
-                             .format(current_app.config['SERVER_NAME'],
-                                     new_site_user_id,
-                                     registration_confirmation_url))
+            mail_msg.html = (
+                'Please click the following link to complete '
+                'your registration: <br><a href={0}>{0}</a>'
+                .format(url_for(
+                    'user.confirm_registration',
+                    site_user_id=new_site_user_id,
+                    confirmation_url=registration_confirmation_url,
+                    _external=True)))
             current_app.config['mail'].send(mail_msg)
             flash('A confirmation email has been sent. '
                   'Please check your inbox.')
@@ -145,13 +146,13 @@ def request_password_reset():
             site_user_id = ret[1]
             mail_msg = Message(
                 'Password Reset', recipients=[request.form['email']])
-            mail_msg.html = ('Please click the following link to reset '
-                             'your password: '
-                             '<br><a href={0}/password_reset/{1}/{2}>'
-                             '{0}/password_reset/{1}/{2}</a>'
-                             .format(current_app.config['SERVER_NAME'],
-                                     site_user_id,
-                                     g.password_reset_url))
+            mail_msg.html = (
+                'Please click the following link to reset '
+                'your password: <br><a href={0}>{0}</a>'
+                .format(url_for('user.reset_password',
+                                site_user_id=site_user_id,
+                                reset_url=g.password_reset_url,
+                                _external=True)))
             current_app.config['mail'].send(mail_msg)
         else:
             flash('An error with the website has occured. The administrator '
@@ -240,22 +241,24 @@ def request_email_reset():
             if status_code == 'success':
                 mail_msg = Message(
                     'Email Reset', recipients=[email])
-                mail_msg.html = ('Please click the below link to reset '
-                                 'your email. After you do so, you will '
-                                 'receive another confirmation at {3} '
-                                 'before the change is finalized. '
-                                 '<br><a href={0}/email_reset/{1}/{2}>'
-                                 '{0}/password_reset/{1}/{2}</a>'
-                                 '<br>If you did not request to change your '
-                                 'email, your account has been compromised. '
-                                 'If this is the case, click this link to '
-                                 'change your password: '
-                                 '<br><a href={0}/password_reset/>'
-                                 '{0}/password_reset/</a>'
-                                 .format(current_app.config['SERVER_NAME'],
-                                         session['site_user_id'],
-                                         g.email_reset_url,
-                                         request.form['new_email']))
+                mail_msg.html = (
+                    'Please click the below link to reset '
+                    'your email. After you do so, you will '
+                    'receive another confirmation at {1} '
+                    'before the change is finalized. '
+                    '<br><a href={0}>{0}</a>'
+                    '<br>If you did not request to change your '
+                    'email, your account has been compromised. '
+                    'If this is the case, click this link to '
+                    'change your password: <br><a href={2}>{2}</a>'
+                    .format(
+                        url_for('user.reset_email',
+                                site_user_id=session['site_user_id'],
+                                reset_url=g.email_reset_url,
+                                _external=True),
+                        request.form['new_email'],
+                        url_for('user.request_password_reset',
+                                _external=True)))
                 current_app.config['mail'].send(mail_msg)
                 flash('Your email reset request has been sent. Please check '
                       'your email for further instructions.')
