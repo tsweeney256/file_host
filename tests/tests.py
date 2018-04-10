@@ -6,7 +6,7 @@ from functools import partial
 from file_host import create_app
 from werkzeug.exceptions import NotFound
 import file_host.blueprints as blueprints
-from file_host.helpers import get_db_connection
+from file_host.helpers import get_db_connection, get_index_str
 from flask import (current_app, g, make_response, _request_ctx_stack,
                    session, url_for)
 
@@ -224,7 +224,7 @@ class MyTests(unittest.TestCase):
             self.assertFlashed(flashes)
         if login:
             self.assert_post_login(
-                flashes=None, redirect_loc='index.index',
+                flashes=None, redirect_loc=get_index_str(),
                 email=email, password=password)
         return generated_reset_url
 
@@ -273,7 +273,7 @@ class MyTests(unittest.TestCase):
             self.assertFlashed(flashes)
             self.assertEqual(response.status_code, status_code)
         if login:
-            self.assert_post_login(None, 'index.index', new_email, password)
+            self.assert_post_login(None, get_index_str(), new_email, password)
         return reset_url
 
     def post_registration(self, email, password, password_confirmation=None):
@@ -480,7 +480,7 @@ class MyTests(unittest.TestCase):
         # confirm first user
         first_url = self.assert_get_confirm_registration(
             flashes=success_flash, site_user_id=self.site_user_id+1,
-            email=user, password=password, redirect_loc='index.index',
+            email=user, password=password, redirect_loc=get_index_str(),
             create_user=True)
 
         # fails when already redeemed
@@ -511,7 +511,7 @@ class MyTests(unittest.TestCase):
         # confirm second user
         self.assert_get_confirm_registration(
             flashes=success_flash, site_user_id=self.site_user_id,
-            confirmation_url=second_url, redirect_loc='index.index')
+            confirmation_url=second_url, redirect_loc=get_index_str())
 
     def test_login(self):
         success_flash = None
@@ -526,7 +526,7 @@ class MyTests(unittest.TestCase):
         # test login of first user
         test_user, test_pass = 'blah@localhost', 'blah'
         self.assert_post_login(flashes=success_flash,
-                               redirect_loc='index.index', create_user=True,
+                               redirect_loc=get_index_str(), create_user=True,
                                email=test_user, password=test_pass)
         # login fails with non-existent account with non-empty database
         self.assert_post_login(flashes=failure_flash, redirect_loc=None,
@@ -534,7 +534,7 @@ class MyTests(unittest.TestCase):
         # test login of second user
         test_user2, test_pass2 = 'hooplah@localhost', 'hooplah'
         self.assert_post_login(flashes=success_flash,
-                               redirect_loc='index.index', create_user=True,
+                               redirect_loc=get_index_str(), create_user=True,
                                email=test_user2, password=test_pass2)
         # test completely wrong password
         self.assert_post_login(flashes=failure_flash, redirect_loc=None,
@@ -622,7 +622,7 @@ class MyTests(unittest.TestCase):
         self.assert_post_reset_password(
             flashes=success, site_user_id=self.site_user_id, password="new",
             email=user, login=True, reset_url=first_url,
-            redirect_loc='index.index')
+            redirect_loc=get_index_str())
         # block redeemed request
         self.assert_post_reset_password(
             flashes=redeemed, site_user_id=self.site_user_id,
@@ -646,13 +646,13 @@ class MyTests(unittest.TestCase):
         self.assert_post_reset_password(
             flashes=success, site_user_id=self.site_user_id,
             password=password, reset_url=second_url,
-            redirect_loc='index.index')
+            redirect_loc=get_index_str())
         # Reset password of second user
         user2, password2 = 'user2@localhost', 'password2'
         self.assert_post_reset_password(
             flashes=success, site_user_id=self.site_user_id+1, email=user2,
             password=password2, create_user=True, request_reset=True,
-            redirect_loc='index.index')
+            redirect_loc=get_index_str())
         # block older reset_urls when newer exist
         current_app.config['CONFIRM_EXPR'] = '0 days'
         loop_urls = []
@@ -670,7 +670,7 @@ class MyTests(unittest.TestCase):
         self.assert_post_reset_password(
             flashes=success, site_user_id=self.site_user_id,
             password="new", reset_url=loop_urls[-1],
-            redirect_loc='index.index')
+            redirect_loc=get_index_str())
         # Reject password mismatch and blank passwords
         pass_mismatch_url = self.assert_post_request_password_reset(
             flashes=request_success, email="new@localhost", password="hooplah",
@@ -804,7 +804,7 @@ class MyTests(unittest.TestCase):
         self.assert_post_reset_email(
             success_flash, success_new_email, success_password,
             old_email=success_old_email, create_user=True, request_reset=True,
-            redirect_loc='index.index', login=True)
+            redirect_loc=get_index_str(), login=True)
         self.site_user_id
 
         # reject wrong site_user_id
@@ -850,7 +850,7 @@ class MyTests(unittest.TestCase):
         self.assert_post_reset_email(
             success_flash, expire_redeem_new_email, expire_redeem_password,
             reset_url=expire_redeem_url, login=True,
-            redirect_loc='index.index')
+            redirect_loc=get_index_str())
         self.assert_post_reset_email(
             redeemed_flash, expire_redeem_new_email,
             reset_url=expire_redeem_url,
@@ -898,7 +898,7 @@ class MyTests(unittest.TestCase):
             success_flash, expired_existing_new_email,
             expired_existing_password,
             reset_url=good_expired_existing_url,
-            redirect_loc='index.index')
+            redirect_loc=get_index_str())
 
 
 if __name__ == '__main__':
